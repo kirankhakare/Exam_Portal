@@ -86,23 +86,32 @@ export default function StudentInstructions() {
         </div>
 
         {/* ====== Exam Pattern Card ====== */}
-        <div className="border border-gray-300 rounded-md bg-[#f8faff] p-5 mb-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-3">
-            📌 Exam Pattern
-          </h3>
+       {/* ====== Exam Pattern Card ====== */}
+<div className="border border-gray-300 rounded-md bg-[#f8faff] p-5 mb-6">
+  <h3 className="text-lg font-semibold text-gray-900 mb-3">
+    📌 Exam Pattern
+  </h3>
 
-          <ul className="space-y-2 text-gray-800">
-            <li>1. <strong>Basic Math / Vedic Math</strong> — 30 Questions</li>
-            <li>2. <strong>HTML</strong> — 10 Questions</li>
-            <li>3. <strong>CSS</strong> — 10 Questions</li>
-            <li>4. <strong>Basic C Programming</strong> — 10 Questions</li>
-          </ul>
+  <ul className="space-y-2 text-gray-800">
+    <li>1. <strong>Basic Math / Vedic Math</strong> — 30 Questions</li>
+    <li>2. <strong>HTML</strong> — 10 Questions</li>
+    <li>3. <strong>CSS</strong> — 10 Questions</li>
+    <li>4. <strong>Basic C Programming</strong> — 10 Questions</li>
+  </ul>
 
-          <div className="mt-4 border-t pt-3 text-gray-900 font-medium">
-            <p>📝 <strong>Total Questions:</strong> 60</p>
-            <p>⏰ <strong>Total Duration:</strong> 1 Hour</p>
-          </div>
-        </div>
+  <div className="mt-4 border-t pt-3 text-gray-900 font-medium space-y-2">
+    <p>📝 <strong>Total Questions:</strong> 60</p>
+    <p>⏰ <strong>Total Duration:</strong> 1 Hour</p>
+
+    {/* ⭐ Final Negative Marking Line (Professional) */}
+    <p className="text-red-600 font-semibold leading-relaxed">
+      ⚠ Negative Marking: 1 mark will be awarded for every correct answer, 
+      and <span className="underline">0.33 marks will be deducted</span> for every wrong answer. 
+      No marks will be deducted for unanswered questions.
+    </p>
+  </div>
+</div>
+
 
         {/* ====== Guidelines ====== */}
         <div className="border border-blue-200 bg-blue-50 p-5 rounded-md mb-6">
