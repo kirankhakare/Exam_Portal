@@ -15,6 +15,7 @@ export default function CreateUser() {
     assignedExam: "",
   });
   const API = import.meta.env.VITE_API_URL;
+  
   const [examList, setExamList] = useState([]);
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState("");

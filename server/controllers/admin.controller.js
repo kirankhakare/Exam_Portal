@@ -33,7 +33,7 @@ export const createUser = async (req, res) => {
     await user.save();
 
     // Portal link (dev mode)
-    const portalLink = "http://localhost:5173/";
+    const portalLink = "https://examportal-lac.vercel.app/";
 
     // Send login details to student
     await sendEmail(
