@@ -32,14 +32,11 @@ export const createUser = async (req, res) => {
 
     await user.save();
 
-    // Portal link (dev mode)
-    const portalLink = "https://examportal-lac.vercel.app/";
-
     // Send login details to student
     await sendEmail(
-      email,
-      "Your Exam Portal Login Details",
-      `
+  email,
+  "Your Exam Portal Login Details",
+  `
 Hello ${name},
 
 Your account has been created successfully.
@@ -48,15 +45,15 @@ LOGIN DETAILS
 Email: ${email}
 Password: ${plainPassword}
 
-Assigned Exam: ${assignedExam}
+Assigned Exam: Aptitude + Programming Test
 
-Exam Portal:
-${portalLink}
+Exam Portal: https://examportal-lac.vercel.app/
 
 Best regards,
 Clickinnovate Team
 `
-    );
+);
+
 
     res.json({ message: "User created successfully", user });
 

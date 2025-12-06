@@ -25,7 +25,7 @@ const router = express.Router();
 // USER ROUTES
 router.post("/create-user", createUser);
 router.get("/users", getUsers);
-router.patch("/toggle-user/:id", toggleUserStatus);
+router.put("/toggle-user/:id", toggleUserStatus);
 router.put("/reassign-exam/:id", reassignExam);
 router.delete("/user/:id", deleteUser);
 router.put("/user/:id", updateUser);
