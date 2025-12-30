@@ -4,15 +4,15 @@ import { useEffect, useState } from "react";
 import axios from "axios";
 import AdminLayout from "../components/AdminLayout";
 import * as XLSX from "xlsx";
-import jsPDF from "jspdf";
-import "jspdf-autotable";
 
 export default function History() {
+  const API = import.meta.env.VITE_API_URL;
+
   const [results, setResults] = useState([]);
   const [search, setSearch] = useState("");
   const [selectedResult, setSelectedResult] = useState(null);
-  const API = import.meta.env.VITE_API_URL;
-  // Fetch results
+
+  /* ================= FETCH RESULTS ================= */
   useEffect(() => {
     const fetchResults = async () => {
       try {
@@ -25,25 +25,24 @@ export default function History() {
     fetchResults();
   }, []);
 
-  // 🔥 Filter (Now includes examTitle)
+  /* ================= FILTER ================= */
   const filtered = results.filter((item) =>
     item.name.toLowerCase().includes(search.toLowerCase()) ||
     item.email.toLowerCase().includes(search.toLowerCase()) ||
     item.examTitle?.toLowerCase().includes(search.toLowerCase())
   );
 
-  // Modal Fetch
+  /* ================= VIEW RESULT ================= */
   const openResult = async (studentId) => {
     try {
       const res = await axios.get(`${API}/admin/result/${studentId}`);
       setSelectedResult(res.data);
-    } catch (err) {
-      console.error("Fetch result error", err);
+    } catch {
       alert("No result available.");
     }
   };
 
-  // 🔥 Updated Excel Export (includes examName)
+  /* ================= EXPORT ================= */
   const downloadExcel = () => {
     const excelData = filtered.map((r) => ({
       Name: r.name,
@@ -57,228 +56,142 @@ export default function History() {
     const worksheet = XLSX.utils.json_to_sheet(excelData);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Results");
-
     XLSX.writeFile(workbook, "StudentResults.xlsx");
   };
 
   return (
     <AdminLayout>
-      <h1 className="text-3xl font-bold mb-6 text-gray-800">Student Results</h1>
+      <div className="space-y-6 px-2 sm:px-4 md:px-6 py-6 bg-[#f2f6fc] min-h-full">
 
-      {/* SEARCH BAR */}
-      <div className="bg-white border border-gray-200 shadow-md rounded-2xl p-5 mb-6">
-        <input
-          type="text"
-          placeholder="Search by name, email, or exam..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="w-full p-3 rounded-xl border border-gray-300 bg-gray-50 focus:ring-2 focus:ring-blue-500"
-        />
-      </div>
+        {/* ================= TITLE ================= */}
+        <div>
+          <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-[#004AAD]">
+            Student Results
+          </h1>
+          <p className="text-gray-600 text-sm sm:text-base mt-1">
+            Complete exam history and performance records
+          </p>
+        </div>
 
-      {/* EXPORT BUTTONS */}
-      <div className="flex gap-4 mb-6">
-        <button
-          onClick={downloadExcel}
-          className="bg-green-600 hover:bg-green-700 transition text-white px-5 py-3 rounded-xl shadow-md font-semibold"
-        >
-          Download Excel
-        </button>
-      </div>
+        {/* ================= SEARCH ================= */}
+        <div className="bg-white border border-gray-200 shadow p-4 sm:p-6">
+          <input
+            type="text"
+            placeholder="Search by name, email, or exam..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full rounded border border-gray-300 px-3 py-2 bg-gray-50 focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
 
-      {/* TABLE */}
-      <div className="bg-white border border-gray-200 rounded-2xl shadow-lg overflow-hidden">
-        <table className="w-full table-auto">
-          <thead className="bg-blue-50 border-b border-gray-200">
-            <tr className="text-gray-700 text-left">
-              <th className="p-4 font-semibold">Name</th>
-              <th className="p-4 font-semibold">Email</th>
+        {/* ================= ACTIONS ================= */}
+        <div>
+          <button
+            onClick={downloadExcel}
+            className="px-5 py-3 bg-green-600 hover:bg-green-700 text-white font-semibold rounded transition"
+          >
+            Download Excel
+          </button>
+        </div>
 
-              {/* ⭐ NEW EXAM COLUMN */}
-              <th className="p-4 font-semibold">Exam</th>
-
-              <th className="p-4 font-semibold">Score</th>
-              <th className="p-4 font-semibold">Percentage</th>
-              <th className="p-4 font-semibold">Date</th>
-              <th className="p-4 font-semibold">Submission Type</th>
-              <th className="p-4 font-semibold">Action</th>
-            </tr>
-          </thead>
-
-          <tbody>
-            {filtered.length === 0 ? (
-              <tr>
-                <td colSpan={7} className="text-center p-6 text-gray-500">
-                  No results found
-                </td>
+        {/* ================= TABLE ================= */}
+        <div className="bg-white border border-gray-200 shadow overflow-x-auto">
+          <table className="min-w-[900px] w-full text-sm sm:text-base">
+            <thead className="bg-blue-50 border-b">
+              <tr className="text-left">
+                <th className="p-3">Name</th>
+                <th className="p-3">Email</th>
+                <th className="p-3">Exam</th>
+                <th className="p-3">Score</th>
+                <th className="p-3">%</th>
+                <th className="p-3">Date</th>
+                <th className="p-3">Type</th>
+                <th className="p-3">Action</th>
               </tr>
-            ) : (
-              filtered.map((r, i) => (
-                <tr
-                  key={i}
-                  className="hover:bg-gray-50 transition border-b border-gray-100"
-                >
-                  <td className="p-4">{r.name}</td>
-                  <td className="p-4">{r.email}</td>
+            </thead>
 
-                  {/* ⭐ SHOW EXAM NAME */}
-                  <td className="p-4">{r.examTitle || "—"}</td>
-                    
-                  <td className="p-4 font-semibold">{r.score}/{r.total}</td>
-                  <td className="p-4 font-semibold">{r.percentage}%</td>
-
-                  <td className="p-4">
-                    {new Date(r.date).toLocaleString()}
-                  </td>
-                  <td className="p-4 capitalize">
-  {r.submissionType.replaceAll("_"," ")}
-</td>
-
-                  <td className="p-4">
-                    <button
-                      onClick={() => openResult(r.studentId)}
-                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow transition"
-                    >
-                      View Result
-                    </button>
+            <tbody>
+              {filtered.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="text-center p-6 text-gray-500">
+                    No results found
                   </td>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      {/* ======== RESULT MODAL ======== */}
-      {selectedResult && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-start justify-center p-4 pt-28">
-          <div className="bg-white p-6 rounded-2xl shadow-2xl w-[650px] max-h-[90vh] overflow-y-auto border border-gray-200">
-
-            <h2 className="text-2xl font-bold mb-3 text-gray-800">Student Result</h2>
-
-            <div className="bg-gray-50 rounded-xl p-4 border border-gray-200 mb-4">
-              <p><b>Name:</b> {selectedResult.studentId?.name}</p>
-              <p><b>Email:</b> {selectedResult.studentId?.email}</p>
-
-              {/* ⭐ SHOW EXAM NAME HERE TOO */}
-              <p><b>Exam:</b> {selectedResult.examId?.title}</p>
-
-              <p className="mt-3 text-lg">
-                <strong>Score:</strong>{" "}
-                <span className="text-green-700 font-bold">
-                  {selectedResult.score}
-                </span>{" "}
-                / {selectedResult.total}
-              </p>
-
-              <p className="text-sm mt-2">
-                <strong>Submitted At: </strong>
-                {new Date(selectedResult.submittedAt).toLocaleString()}
-              </p>
-            </div>
-
-            {/* ANSWER DETAILS (no changes here) */}
-            <h3 className="text-xl font-bold mt-4 mb-3 text-gray-800">
-              Detailed Answers
-            </h3>
-
-            {selectedResult.answers?.length > 0 ? (
-              selectedResult.answers.map((item, index) => {
-                const getAnswerText = (valKey, textField) => {
-                  if (textField) return textField;
-                  if (!valKey || valKey === "Not Attempted") return "Not Attempted";
-
-                  if (/^[ABCD]$/i.test(valKey)) {
-                    const key = "option" + valKey.toUpperCase();
-                    return item[key] || valKey;
-                  }
-                  return valKey;
-                };
-
-                const userAns = getAnswerText(item.selectedAnswer, item.selectedAnswerText);
-                const correctAns = getAnswerText(item.correctAnswer, item.correctAnswerText);
-
-                return (
-                  <div
-                    key={index}
-                    className="p-4 border border-gray-200 rounded-xl bg-white shadow-sm mb-3"
-                  >
-                    <p className="font-semibold text-gray-800">
-                      Q{index + 1}: {item.question}
-                    </p>
-
-                    <p className="mt-1">
-                      <b>Your Answer:</b>{" "}
-                      <span
-                        className={`${
-                          item.selectedAnswer === "Not Attempted"
-                            ? "text-gray-500"
-                            : item.isCorrect
-                            ? "text-green-700 font-bold"
-                            : "text-red-700 font-bold"
-                        }`}
+              ) : (
+                filtered.map((r, i) => (
+                  <tr key={i} className="border-b hover:bg-gray-50">
+                    <td className="p-3">{r.name}</td>
+                    <td className="p-3">{r.email}</td>
+                    <td className="p-3">{r.examTitle || "—"}</td>
+                    <td className="p-3 font-semibold">{r.score}/{r.total}</td>
+                    <td className="p-3 font-semibold">{r.percentage}%</td>
+                    <td className="p-3">{new Date(r.date).toLocaleString()}</td>
+                    <td className="p-3 capitalize">
+                      {r.submissionType.replaceAll("_", " ")}
+                    </td>
+                    <td className="p-3">
+                      <button
+                        onClick={() => openResult(r.studentId)}
+                        className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded transition"
                       >
-                        {userAns}
-                      </span>
-                    </p>
-
-                    <p>
-                      <b>Correct Answer:</b>{" "}
-                      <span className="text-blue-700 font-semibold">
-                        {correctAns}
-                      </span>
-                    </p>
-
-                    <p className="mt-1">
-                      <b>Marks Awarded:</b>{" "}
-                      <span
-                        className={`font-bold ${
-                          item.marksGiven > 0
-                            ? "text-green-700"
-                            : item.marksGiven < 0
-                            ? "text-red-700"
-                            : "text-gray-700"
-                        }`}
-                      >
-                        {item.marksGiven}
-                      </span>
-                    </p>
-
-                    <p
-                      className={`mt-2 font-semibold ${
-                        item.isCorrect
-                          ? "text-green-600"
-                          : item.selectedAnswer === "Not Attempted"
-                          ? "text-gray-500"
-                          : "text-red-600"
-                      }`}
-                    >
-                      {item.selectedAnswer === "Not Attempted"
-                        ? "Not Attempted"
-                        : item.isCorrect
-                        ? "Correct"
-                        : "Wrong"}
-                    </p>
-                  </div>
-                );
-              })
-            ) : (
-              <p className="text-gray-500">No answer details found.</p>
-            )}
-
-            {/* CLOSE BUTTON */}
-            <div className="text-right">
-              <button
-                onClick={() => setSelectedResult(null)}
-                className="mt-4 px-5 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg shadow transition"
-              >
-                Close
-              </button>
-            </div>
-
-          </div>
+                        View
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
         </div>
-      )}
+
+        {/* ================= RESULT MODAL ================= */}
+        {selectedResult && (
+          <div className="fixed inset-0 bg-black/40 flex items-start justify-center p-4 pt-20 z-50">
+            <div className="bg-white max-w-2xl w-full rounded shadow-xl p-5 overflow-y-auto max-h-[85vh]">
+
+              <h2 className="text-xl font-bold mb-2">Student Result</h2>
+
+              <div className="bg-gray-50 border p-4 mb-4 text-sm">
+                <p><b>Name:</b> {selectedResult.studentId?.name}</p>
+                <p><b>Email:</b> {selectedResult.studentId?.email}</p>
+                <p><b>Exam:</b> {selectedResult.examId?.title}</p>
+                <p className="mt-2 font-semibold text-green-700">
+                  Score: {selectedResult.score}/{selectedResult.total}
+                </p>
+              </div>
+
+              <h3 className="font-bold mb-2">Detailed Answers</h3>
+
+              {selectedResult.answers?.map((a, i) => (
+                <div key={i} className="border p-3 mb-3 text-sm">
+                  <p className="font-semibold">
+                    Q{i + 1}: {a.question}
+                  </p>
+                  <p>
+                    Your Answer:{" "}
+                    <span className={a.isCorrect ? "text-green-700" : "text-red-700"}>
+                      {a.selectedAnswerText || "Not Attempted"}
+                    </span>
+                  </p>
+                  <p className="text-blue-700">
+                    Correct: {a.correctAnswerText}
+                  </p>
+                </div>
+              ))}
+
+              <div className="text-right">
+                <button
+                  onClick={() => setSelectedResult(null)}
+                  className="mt-3 px-5 py-2 bg-red-600 hover:bg-red-700 text-white rounded"
+                >
+                  Close
+                </button>
+              </div>
+
+            </div>
+          </div>
+        )}
+      </div>
     </AdminLayout>
   );
 }

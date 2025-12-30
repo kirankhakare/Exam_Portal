@@ -58,7 +58,7 @@ const sendResultEmail = async (toEmail, studentName, examTitle, pdfBuffer) => {
 Your exam result for "${examTitle}" is attached as a PDF.
 
 Regards,
-Exam Portal`,
+Clickinnovate Portal`,
     attachments: [],
   };
 

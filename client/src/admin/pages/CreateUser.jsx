@@ -3,6 +3,8 @@ import { useState, useEffect } from "react";
 import AdminLayout from "../components/AdminLayout";
 
 export default function CreateUser() {
+  const API = import.meta.env.VITE_API_URL;
+
   const [form, setForm] = useState({
     name: "",
     email: "",
@@ -14,30 +16,28 @@ export default function CreateUser() {
     state: "",
     assignedExam: "",
   });
-  const API = import.meta.env.VITE_API_URL;
-  
+
   const [examList, setExamList] = useState([]);
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState("");
   const [err, setErr] = useState("");
 
+  /* ================= INPUT HANDLER ================= */
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
+  /* ================= SUBMIT ================= */
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
-    setErr("");
     setMsg("");
+    setErr("");
 
     try {
-      const res = await axios.post(
-        `${API}/admin/create-user`,
-        form
-      );
-
+      await axios.post(`${API}/admin/create-user`, form);
       setMsg("User created successfully!");
+
       setForm({
         name: "",
         email: "",
@@ -56,13 +56,14 @@ export default function CreateUser() {
     setLoading(false);
   };
 
+  /* ================= FETCH EXAMS ================= */
   useEffect(() => {
     const fetchExams = async () => {
       try {
         const res = await axios.get(`${API}/exams/all`);
         setExamList(res.data);
       } catch (err) {
-        console.error("Error loading exams", err);
+        console.error("Failed to load exams", err);
       }
     };
 
@@ -71,166 +72,166 @@ export default function CreateUser() {
 
   return (
     <AdminLayout>
-      <h1 className="text-4xl font-bold mb-8 text-gray-800 tracking-tight">
-        Create New User
-      </h1>
+      <div className="space-y-6 px-2 sm:px-4 md:px-6 py-6 bg-[#f2f6fc] min-h-full">
 
-      <div className="bg-white/90 backdrop-blur-md shadow-xl rounded-2xl p-8 border border-gray-200 max-w-4xl">
+        {/* ================= TITLE ================= */}
+        <div>
+          <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-[#004AAD]">
+            Create New User
+          </h1>
+          <p className="text-gray-600 text-sm sm:text-base mt-1">
+            Register a student and assign an exam
+          </p>
+        </div>
 
-        {/* Messages */}
-        {msg && (
-          <div className="bg-green-100 text-green-700 p-3 mb-4 rounded-xl shadow-sm border border-green-200">
-            {msg}
-          </div>
-        )}
+        {/* ================= FORM CARD ================= */}
+        <div className="bg-white border border-gray-200 shadow p-4 sm:p-6 max-w-4xl">
 
-        {err && (
-          <div className="bg-red-100 text-red-700 p-3 mb-4 rounded-xl shadow-sm border border-red-200">
-            {err}
-          </div>
-        )}
+          {/* Messages */}
+          {msg && (
+            <div className="mb-4 rounded border border-green-200 bg-green-100 p-3 text-green-700 text-sm">
+              {msg}
+            </div>
+          )}
 
-        <form
-          onSubmit={handleSubmit}
-          className="grid grid-cols-1 md:grid-cols-2 gap-6"
-        >
-          {/* Name */}
-          <InputField
-            label="Full Name"
-            name="name"
-            value={form.name}
-            onChange={handleChange}
-            placeholder="Enter full name"
-          />
+          {err && (
+            <div className="mb-4 rounded border border-red-200 bg-red-100 p-3 text-red-700 text-sm">
+              {err}
+            </div>
+          )}
 
-          {/* Email */}
-          <InputField
-            label="Email"
-            type="email"
-            name="email"
-            value={form.email}
-            onChange={handleChange}
-            placeholder="Enter email"
-          />
+          <form
+            onSubmit={handleSubmit}
+            className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6"
+          >
+            <InputField
+              label="Full Name"
+              name="name"
+              value={form.name}
+              onChange={handleChange}
+              placeholder="Enter full name"
+            />
 
-          {/* Phone */}
-          <InputField
-            label="Phone"
-            name="phone"
-            value={form.phone}
-            onChange={handleChange}
-            placeholder="Enter phone number"
-          />
+            <InputField
+              label="Email"
+              type="email"
+              name="email"
+              value={form.email}
+              onChange={handleChange}
+              placeholder="Enter email"
+            />
 
-          {/* Gender */}
-          <div>
-            <label className="block text-gray-700 mb-2 font-semibold">
-              Gender
-            </label>
-            <select
+            <InputField
+              label="Phone"
+              name="phone"
+              value={form.phone}
+              onChange={handleChange}
+              placeholder="Enter phone number"
+            />
+
+            {/* Gender */}
+            <SelectField
+              label="Gender"
               name="gender"
               value={form.gender}
               onChange={handleChange}
-              className="w-full p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 transition bg-gray-50"
-            >
-              <option value="">Select</option>
-              <option value="Male">Male</option>
-              <option value="Female">Female</option>
-              <option value="Other">Other</option>
-            </select>
-          </div>
+              options={["Male", "Female", "Other"]}
+            />
 
-          {/* Assign Exam */}
-          <div>
-            <label className="block text-gray-700 mb-2 font-semibold">
-              Assign Exam
-            </label>
-            <select
-              name="assignedExam"
-              required
-              value={form.assignedExam}
+            {/* Assign Exam */}
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-1">
+                Assign Exam
+              </label>
+              <select
+                name="assignedExam"
+                value={form.assignedExam}
+                required
+                onChange={handleChange}
+                className="w-full rounded border border-gray-300 px-3 py-2 bg-gray-50 focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">Select Exam</option>
+                {examList.map((exam) => (
+                  <option key={exam._id} value={exam._id}>
+                    {exam.title}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <InputField
+              label="Date of Birth"
+              type="date"
+              name="dob"
+              value={form.dob}
               onChange={handleChange}
-              className="w-full p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 transition bg-gray-50"
-            >
-              <option value="">Select Exam</option>
-              {examList.map((exam) => (
-                <option key={exam._id} value={exam._id}>
-                  {exam.title}
-                </option>
-              ))}
-            </select>
-          </div>
+            />
 
-          {/* DOB */}
-          <InputField
-            label="Date of Birth"
-            type="date"
-            name="dob"
-            value={form.dob}
-            onChange={handleChange}
-          />
-
-          {/* City */}
-          <InputField
-            label="City"
-            name="city"
-            value={form.city}
-            onChange={handleChange}
-            placeholder="Enter city"
-          />
-
-          {/* State */}
-          <InputField
-            label="State"
-            name="state"
-            value={form.state}
-            onChange={handleChange}
-            placeholder="Enter state"
-          />
-
-          {/* Address */}
-          <div className="md:col-span-2">
-            <label className="block text-gray-700 mb-2 font-semibold">
-              Full Address
-            </label>
-            <textarea
-              name="address"
-              value={form.address}
+            <InputField
+              label="City"
+              name="city"
+              value={form.city}
               onChange={handleChange}
-              placeholder="Enter full address"
-              rows="3"
-              className="w-full p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 transition bg-gray-50"
-            ></textarea>
-          </div>
+              placeholder="Enter city"
+            />
 
-          {/* Button */}
-          <div className="md:col-span-2">
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-lg transition shadow-lg"
-            >
-              {loading ? "Creating User..." : "Create User"}
-            </button>
-          </div>
-        </form>
+            <InputField
+              label="State"
+              name="state"
+              value={form.state}
+              onChange={handleChange}
+              placeholder="Enter state"
+            />
+
+            {/* Address */}
+            <div className="sm:col-span-2">
+              <label className="block text-sm font-semibold text-gray-700 mb-1">
+                Full Address
+              </label>
+              <textarea
+                name="address"
+                value={form.address}
+                onChange={handleChange}
+                rows="3"
+                placeholder="Enter full address"
+                className="w-full rounded border border-gray-300 px-3 py-2 bg-gray-50 focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+
+            {/* Submit */}
+            <div className="sm:col-span-2">
+              <button
+                type="submit"
+                disabled={loading}
+                className="
+                  w-full sm:w-auto
+                  px-6 py-3
+                  rounded
+                  bg-blue-600
+                  hover:bg-blue-700
+                  text-white
+                  font-semibold
+                  transition
+                "
+              >
+                {loading ? "Creating User..." : "Create User"}
+              </button>
+            </div>
+          </form>
+        </div>
       </div>
     </AdminLayout>
   );
 }
 
-/* Reusable input component for cleaner UI */
-function InputField({
-  label,
-  type = "text",
-  name,
-  value,
-  onChange,
-  placeholder,
-}) {
+/* ================= REUSABLE COMPONENTS ================= */
+
+function InputField({ label, type = "text", name, value, onChange, placeholder }) {
   return (
     <div>
-      <label className="block text-gray-700 mb-2 font-semibold">{label}</label>
+      <label className="block text-sm font-semibold text-gray-700 mb-1">
+        {label}
+      </label>
       <input
         type={type}
         name={name}
@@ -238,8 +239,31 @@ function InputField({
         required
         onChange={onChange}
         placeholder={placeholder}
-        className="w-full p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 transition bg-gray-50"
+        className="w-full rounded border border-gray-300 px-3 py-2 bg-gray-50 focus:ring-2 focus:ring-blue-500"
       />
+    </div>
+  );
+}
+
+function SelectField({ label, name, value, onChange, options }) {
+  return (
+    <div>
+      <label className="block text-sm font-semibold text-gray-700 mb-1">
+        {label}
+      </label>
+      <select
+        name={name}
+        value={value}
+        onChange={onChange}
+        className="w-full rounded border border-gray-300 px-3 py-2 bg-gray-50 focus:ring-2 focus:ring-blue-500"
+      >
+        <option value="">Select</option>
+        {options.map((opt) => (
+          <option key={opt} value={opt}>
+            {opt}
+          </option>
+        ))}
+      </select>
     </div>
   );
 }

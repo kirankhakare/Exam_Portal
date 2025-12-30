@@ -3,6 +3,8 @@ import axios from "axios";
 import AdminLayout from "../components/AdminLayout";
 
 export default function UploadQuestions() {
+  const API = import.meta.env.VITE_API_URL;
+
   const [file, setFile] = useState(null);
   const [message, setMessage] = useState("");
 
@@ -10,14 +12,12 @@ export default function UploadQuestions() {
   const [selectedExam, setSelectedExam] = useState("");
   const [newExamTitle, setNewExamTitle] = useState("");
 
-  // NEW: exam config fields
-  const [duration, setDuration] = useState(30); // minutes default
+  const [duration, setDuration] = useState(30);
   const [availableFrom, setAvailableFrom] = useState("");
   const [availableTo, setAvailableTo] = useState("");
   const [marksCorrect, setMarksCorrect] = useState(4);
   const [marksWrong, setMarksWrong] = useState(0);
   const [marksNotAttempted, setMarksNotAttempted] = useState(0);
-  const API = import.meta.env.VITE_API_URL;
 
   const [loadingExams, setLoadingExams] = useState(false);
   const [creatingExam, setCreatingExam] = useState(false);
@@ -31,18 +31,15 @@ export default function UploadQuestions() {
 
   const fileInputRef = useRef(null);
 
-  // FETCH EXAMS
+  /* ================= FETCH EXAMS ================= */
   const fetchExams = async () => {
     try {
       setLoadingExams(true);
       const token = localStorage.getItem("token");
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
-      const res = await axios.get(`${API}/admin/exams`, {
-        headers,
-      });
+      const res = await axios.get(`${API}/admin/exams`, { headers });
       setExams(res.data || []);
-    } catch (err) {
-      console.error("Error loading exams", err);
+    } catch {
       setMessage("Failed to load exams");
     } finally {
       setLoadingExams(false);
@@ -53,73 +50,53 @@ export default function UploadQuestions() {
     fetchExams();
   }, []);
 
-  // LOAD QUESTIONS
+  /* ================= LOAD QUESTIONS ================= */
   const loadExamQuestions = async (examId) => {
     if (!examId) return;
-
     try {
       const token = localStorage.getItem("token");
-      const headers = token ? { Authorization: `Bearer ${token}` } : {};
-
-      const res = await axios.get(
-        `${API}/admin/exam-questions/${examId}`,
-        { headers }
-      );
-
+      const headers = { Authorization: `Bearer ${token}` };
+      const res = await axios.get(`${API}/admin/exam-questions/${examId}`, { headers });
       setExamQuestions(res.data.questions || []);
       setSelectedQuestions([]);
       setSelectAll(false);
-    } catch (err) {
-      console.error("Error loading exam questions", err);
-      setMessage("Failed to load exam questions");
+    } catch {
+      setMessage("Failed to load questions");
     }
   };
 
-  // CREATE EXAM (UPDATED: include timer / availability / marks)
+  /* ================= CREATE EXAM ================= */
   const createExam = async () => {
-    if (newExamTitle.trim() === "") {
-      alert("Enter exam title");
-      return;
-    }
-
-    // basic validation for availability
+    if (!newExamTitle.trim()) return alert("Enter exam title");
     if (availableFrom && availableTo && new Date(availableFrom) >= new Date(availableTo)) {
-      alert("Available To must be later than Available From");
-      return;
+      return alert("Invalid availability range");
     }
 
     try {
       setCreatingExam(true);
       const token = localStorage.getItem("token");
-      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      const headers = { Authorization: `Bearer ${token}` };
 
-      // Convert datetime-local to ISO if present
       const payload = {
         title: newExamTitle.trim(),
-        duration: Number(duration) || 0, // minutes
-        marksCorrect: Number(marksCorrect) || 0,
-        marksWrong: Number(marksWrong) || 0,
-        marksNotAttempted: Number(marksNotAttempted) || 0,
+        duration: Number(duration),
+        marksCorrect: Number(marksCorrect),
+        marksWrong: Number(marksWrong),
+        marksNotAttempted: Number(marksNotAttempted),
       };
 
       if (availableFrom) payload.availableFrom = new Date(availableFrom).toISOString();
       if (availableTo) payload.availableTo = new Date(availableTo).toISOString();
 
-      const res = await axios.post(
-        `${API}/admin/create-exam`,
-        payload,
-        { headers }
-      );
-
+      const res = await axios.post(`${API}/admin/create-exam`, payload, { headers });
       const created = res.data?.exam || res.data;
 
       await fetchExams();
-      if (created && created._id) {
+      if (created?._id) {
         setSelectedExam(created._id);
         loadExamQuestions(created._id);
       }
 
-      // reset create form (but keep sensible defaults)
       setNewExamTitle("");
       setDuration(30);
       setAvailableFrom("");
@@ -129,107 +106,44 @@ export default function UploadQuestions() {
       setMarksNotAttempted(0);
 
       setMessage("Exam created successfully");
-    } catch (err) {
-      console.error("Create exam error:", err);
-      setMessage(err.response?.data?.message || "Failed to create exam");
+    } catch {
+      setMessage("Failed to create exam");
     } finally {
       setCreatingExam(false);
     }
   };
 
-  // UPLOAD FILE
+  /* ================= UPLOAD FILE ================= */
   const handleUpload = async (e) => {
     e.preventDefault();
-    setMessage("");
-
-    if (!file) return setMessage("Please select an Excel file");
-    if (!selectedExam) return setMessage("Please select an exam");
+    if (!file || !selectedExam) return setMessage("Select exam and file");
 
     try {
       setUploading(true);
-
       const token = localStorage.getItem("token");
-      const headers = token
-        ? { Authorization: `Bearer ${token}`, "Content-Type": "multipart/form-data" }
-        : { "Content-Type": "multipart/form-data" };
+      const headers = {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "multipart/form-data",
+      };
 
       const formData = new FormData();
       formData.append("file", file);
       formData.append("examId", selectedExam);
 
-      const res = await axios.post(
-        `${API}/admin/upload-questions`,
-        formData,
-        { headers }
-      );
+      const res = await axios.post(`${API}/admin/upload-questions`, formData, { headers });
+      setMessage(`Uploaded ${res.data.count} questions successfully`);
 
-      setMessage(`Uploaded ${res.data.count} questions successfully!`);
-
-      await fetchExams();
       await loadExamQuestions(selectedExam);
-
       setFile(null);
       if (fileInputRef.current) fileInputRef.current.value = "";
-    } catch (error) {
-      console.error(error);
-      setMessage(error.response?.data?.message || "Upload failed");
+    } catch {
+      setMessage("Upload failed");
     } finally {
       setUploading(false);
     }
   };
 
-  // UPDATE QUESTION
-  const updateQuestion = async (q) => {
-    try {
-      const token = localStorage.getItem("token");
-      const headers = { Authorization: `Bearer ${token}` };
-
-      await axios.patch(
-        `${API}/admin/update-question/${q._id}`,
-        q,
-        { headers }
-      );
-
-      setEditingQ(null);
-      loadExamQuestions(selectedExam);
-      setMessage("Question updated successfully!");
-    } catch (err) {
-      console.error("Update question error:", err);
-      setMessage("Failed to update question");
-    }
-  };
-
-  // DELETE QUESTION
-  const deleteQuestion = async (id) => {
-    if (!window.confirm("Are you sure you want to delete this question?")) return;
-
-    try {
-      const token = localStorage.getItem("token");
-      const headers = { Authorization: `Bearer ${token}` };
-
-      await axios.delete(
-        `${API}/admin/delete-question/${id}`,
-        { headers }
-      );
-
-      loadExamQuestions(selectedExam);
-      setMessage("Question deleted");
-    } catch (err) {
-      console.error("Delete question error:", err);
-      setMessage("Failed to delete");
-    }
-  };
-
-  // TOGGLE SELECT QUESTION
-  const toggleSelect = (id) => {
-    setSelectedQuestions((prev) =>
-      prev.includes(id)
-        ? prev.filter((x) => x !== id)
-        : [...prev, id]
-    );
-  };
-
-  // BULK DELETE
+  /* ================= BULK DELETE ================= */
   const handleBulkDelete = async () => {
     if (!window.confirm("Delete selected questions?")) return;
 
@@ -237,188 +151,94 @@ export default function UploadQuestions() {
       const token = localStorage.getItem("token");
       const headers = { Authorization: `Bearer ${token}` };
 
-      await axios.post(
-        `${API}/admin/bulk-delete`,
-        { ids: selectedQuestions },
-        { headers }
-      );
-
+      await axios.post(`${API}/admin/bulk-delete`, { ids: selectedQuestions }, { headers });
       loadExamQuestions(selectedExam);
       setSelectedQuestions([]);
       setSelectAll(false);
-
-      setMessage("Selected questions deleted successfully!");
-    } catch (err) {
-      console.error("Bulk delete error:", err);
+      setMessage("Selected questions deleted");
+    } catch {
+      setMessage("Bulk delete failed");
     }
   };
 
   return (
     <AdminLayout>
-      <h1 className="text-3xl font-bold mb-6 text-gray-800">
-        Upload Exam Questions
-      </h1>
+      <div className="space-y-6 px-2 sm:px-4 md:px-6 py-6 bg-[#f2f6fc] min-h-full">
 
-      {/* Upload Section */}
-      <div className="bg-white shadow-xl rounded-2xl p-6 border border-gray-200 mb-8">
-        <form onSubmit={handleUpload} className="grid md:grid-cols-3 gap-4">
+        {/* ================= TITLE ================= */}
+        <div>
+          <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-[#004AAD]">
+            Upload Exam Questions
+          </h1>
+          <p className="text-gray-600 text-sm sm:text-base mt-1">
+            Create exams, upload questions, and manage question banks
+          </p>
+        </div>
 
-          {/* Select Exam */}
-          <div className="md:col-span-1">
-            <label className="block font-semibold mb-2 text-gray-700">Select Exam</label>
-            <select
-              className="border p-3 w-full rounded-lg bg-gray-50 focus:ring-2 focus:ring-blue-500"
+        {/* ================= UPLOAD ================= */}
+        <Card>
+          <form onSubmit={handleUpload} className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Select
+              label="Select Exam"
               value={selectedExam}
               onChange={(e) => {
                 setSelectedExam(e.target.value);
                 loadExamQuestions(e.target.value);
               }}
-            >
-              <option value="">-- Select Exam --</option>
-              {exams.map((exam) => (
-                <option key={exam._id} value={exam._id}>
-                  {exam.title}
-                </option>
-              ))}
-            </select>
-          </div>
+              options={exams.map((e) => ({ value: e._id, label: e.title }))}
+            />
 
-          {/* File */}
-          <div className="md:col-span-1">
-            <label className="block font-semibold mb-2 text-gray-700">Excel File</label>
-            <input
-              ref={fileInputRef}
+            <Input
+              label="Excel File"
               type="file"
-              accept=".xlsx, .xls"
+              accept=".xlsx,.xls"
+              ref={fileInputRef}
               onChange={(e) => setFile(e.target.files[0])}
-              className="border p-3 w-full rounded-lg bg-gray-50 focus:ring-2 focus:ring-blue-500"
             />
-          </div>
 
-          {/* Button */}
-          <div className="md:col-span-1 flex items-end">
-            <button
-              className="w-full bg-green-600 hover:bg-green-700 text-white rounded-lg py-3 font-semibold transition"
-              type="submit"
-            >
-              {uploading ? "Uploading..." : "Upload"}
-            </button>
-          </div>
-        </form>
+            <Button type="submit" loading={uploading}>
+              Upload
+            </Button>
+          </form>
+          {message && <p className="mt-3 text-blue-600 font-semibold">{message}</p>}
+        </Card>
 
-        {message && (
-          <p className="mt-4 text-blue-600 text-lg font-semibold">{message}</p>
-        )}
-      </div>
+        {/* ================= CREATE EXAM ================= */}
+        <Card>
+          <h2 className="text-lg font-semibold mb-3">Create New Exam</h2>
 
-      {/* Create Exam */}
-      <div className="bg-white shadow-xl rounded-2xl p-6 border border-gray-200 mb-8">
-        <h2 className="text-xl font-bold mb-3 text-gray-800">Create New Exam</h2>
-
-        <div className="grid md:grid-cols-3 gap-4">
-          <input
-            type="text"
-            placeholder="Enter exam title"
-            className="border p-3 rounded-lg w-full bg-gray-50 focus:ring-2 focus:ring-blue-500 md:col-span-1"
-            value={newExamTitle}
-            onChange={(e) => setNewExamTitle(e.target.value)}
-          />
-
-          {/* Duration */}
-          <input
-            type="number"
-            min="1"
-            placeholder="Duration (minutes)"
-            className="border p-3 rounded-lg w-full bg-gray-50 focus:ring-2 focus:ring-blue-500"
-            value={duration}
-            onChange={(e) => setDuration(e.target.value)}
-          />
-
-          {/* Marks - correct/wrong/not attempted */}
-          <div className="flex gap-2 md:col-span-1">
-            <input
-              type="number"
-              placeholder="Marks Correct"
-              className="border p-3 rounded-lg w-1/3 bg-gray-50 focus:ring-2 focus:ring-blue-500"
-              value={marksCorrect}
-              onChange={(e) => setMarksCorrect(e.target.value)}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Input
+              placeholder="Exam title"
+              value={newExamTitle}
+              onChange={(e) => setNewExamTitle(e.target.value)}
             />
-            <input
-              type="number"
-              placeholder="Marks Wrong"
-              className="border p-3 rounded-lg w-1/3 bg-gray-50 focus:ring-2 focus:ring-blue-500"
-              value={marksWrong}
-              onChange={(e) => setMarksWrong(e.target.value)}
-            />
-            <input
-              type="number"
-              placeholder="Not Attempted"
-              className="border p-3 rounded-lg w-1/3 bg-gray-50 focus:ring-2 focus:ring-blue-500"
-              value={marksNotAttempted}
-              onChange={(e) => setMarksNotAttempted(e.target.value)}
-            />
+            <Input type="number" placeholder="Duration (min)" value={duration} onChange={(e) => setDuration(e.target.value)} />
+            <Input type="number" placeholder="Marks Correct" value={marksCorrect} onChange={(e) => setMarksCorrect(e.target.value)} />
+            <Input type="number" placeholder="Marks Wrong" value={marksWrong} onChange={(e) => setMarksWrong(e.target.value)} />
+            <Input type="number" placeholder="Not Attempted" value={marksNotAttempted} onChange={(e) => setMarksNotAttempted(e.target.value)} />
+            <Input type="datetime-local" value={availableFrom} onChange={(e) => setAvailableFrom(e.target.value)} />
+            <Input type="datetime-local" value={availableTo} onChange={(e) => setAvailableTo(e.target.value)} />
+
+            <Button onClick={createExam} loading={creatingExam}>
+              Create Exam
+            </Button>
           </div>
+        </Card>
 
-          {/* Available From */}
-          <div>
-            <label className="block text-sm text-gray-600 mb-1">Available From</label>
-            <input
-              type="datetime-local"
-              className="border p-3 rounded-lg w-full bg-gray-50 focus:ring-2 focus:ring-blue-500"
-              value={availableFrom}
-              onChange={(e) => setAvailableFrom(e.target.value)}
-            />
-          </div>
-
-          {/* Available To */}
-          <div>
-            <label className="block text-sm text-gray-600 mb-1">Available To</label>
-            <input
-              type="datetime-local"
-              className="border p-3 rounded-lg w-full bg-gray-50 focus:ring-2 focus:ring-blue-500"
-              value={availableTo}
-              onChange={(e) => setAvailableTo(e.target.value)}
-            />
-          </div>
-
-          {/* Create button (span full width on md) */}
-          <div className="flex items-end">
-            <button
-              onClick={(e) => {
-                e.preventDefault();
-                createExam();
-              }}
-              disabled={creatingExam}
-              className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition w-full"
-            >
-              {creatingExam ? "Creating..." : "Create Exam"}
-            </button>
-          </div>
-        </div>
-
-      </div>
-
-      {/* Manage Questions (unchanged) */}
-      {selectedExam && (
-        <div className="mt-10">
-          <h2 className="text-2xl font-bold mb-4 text-gray-800">
-            Manage Questions
-          </h2>
-
-          {/* SELECT ALL + BULK DELETE */}
-          {examQuestions.length > 0 && (
-            <div className="flex justify-between items-center mb-4 bg-white p-4 rounded-xl shadow border border-gray-200">
-              <label className="flex items-center gap-2 text-gray-700 font-semibold">
+        {/* ================= MANAGE QUESTIONS ================= */}
+        {selectedExam && (
+          <Card>
+            <div className="flex justify-between items-center mb-3">
+              <label className="flex items-center gap-2">
                 <input
                   type="checkbox"
                   checked={selectAll}
                   onChange={(e) => {
                     setSelectAll(e.target.checked);
-                    if (e.target.checked) {
-                      setSelectedQuestions(examQuestions.map((q) => q._id));
-                    } else {
-                      setSelectedQuestions([]);
-                    }
+                    setSelectedQuestions(
+                      e.target.checked ? examQuestions.map((q) => q._id) : []
+                    );
                   }}
                 />
                 Select All
@@ -426,112 +246,93 @@ export default function UploadQuestions() {
 
               {selectedQuestions.length > 0 && (
                 <button
-                  className="bg-red-600 hover:bg-red-700 text-white px-5 py-2 rounded-lg font-semibold transition"
                   onClick={handleBulkDelete}
+                  className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded"
                 >
                   Delete Selected ({selectedQuestions.length})
                 </button>
               )}
             </div>
-          )}
 
-          {/* Question Cards */}
-          {examQuestions.length === 0 ? (
-            <p>No questions available.</p>
-          ) : (
-            examQuestions.map((q) => (
-              <div
-                key={q._id}
-                className="bg-white p-5 border border-gray-200 rounded-xl shadow-sm mb-4 flex items-start gap-4 hover:shadow-md transition"
-              >
-                <input
-                  type="checkbox"
-                  checked={selectedQuestions.includes(q._id)}
-                  onChange={() => toggleSelect(q._id)}
-                />
-
-                <div className="flex-1">
-                  <p className="font-semibold text-gray-800 mb-1">
-                    {q.question}
-                  </p>
+            {examQuestions.length === 0 ? (
+              <p>No questions available.</p>
+            ) : (
+              examQuestions.map((q) => (
+                <div
+                  key={q._id}
+                  className="border p-3 mb-3 rounded flex items-center gap-3 bg-white"
+                >
+                  <input
+                    type="checkbox"
+                    checked={selectedQuestions.includes(q._id)}
+                    onChange={() =>
+                      setSelectedQuestions((prev) =>
+                        prev.includes(q._id)
+                          ? prev.filter((x) => x !== q._id)
+                          : [...prev, q._id]
+                      )
+                    }
+                  />
+                  <p className="flex-1">{q.question}</p>
+                  <button
+                    onClick={() => setEditingQ(q)}
+                    className="px-3 py-1 bg-blue-600 text-white rounded"
+                  >
+                    Edit
+                  </button>
                 </div>
+              ))
+            )}
+          </Card>
+        )}
 
-                <button
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
-                  onClick={() => setEditingQ(q)}
-                >
-                  Edit
-                </button>
-
-                <button
-                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition"
-                  onClick={() => deleteQuestion(q._id)}
-                >
-                  Delete
-                </button>
-              </div>
-            ))
-          )}
-        </div>
-      )}
-
-      {/* EDIT QUESTION MODAL (unchanged) */}
-      {editingQ && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-md flex justify-center items-center p-6">
-          <div className="bg-white rounded-2xl shadow-xl p-6 w-[500px] border border-gray-200">
-
-            <h3 className="text-2xl font-bold mb-4 text-gray-800">
-              Edit Question
-            </h3>
-
-            <input
-              type="text"
-              className="border p-3 w-full rounded-lg bg-gray-50 mb-3 focus:ring-2 focus:ring-blue-500"
-              value={editingQ.question}
-              onChange={(e) => setEditingQ({ ...editingQ, question: e.target.value })}
-            />
-
-            {["A", "B", "C", "D"].map((opt) => (
-              <input
-                key={opt}
-                type="text"
-                className="border p-3 w-full rounded-lg bg-gray-50 mb-2 focus:ring-2 focus:ring-blue-500"
-                value={editingQ["option" + opt]}
-                onChange={(e) =>
-                  setEditingQ({ ...editingQ, ["option" + opt]: e.target.value })
-                }
-              />
-            ))}
-
-            <select
-              className="border p-3 w-full rounded-lg bg-gray-50 mb-4 focus:ring-2 focus:ring-blue-500"
-              value={editingQ.correctAnswer}
-              onChange={(e) => setEditingQ({ ...editingQ, correctAnswer: e.target.value })}
-            >
-              <option value="A">Correct Answer: A</option>
-              <option value="B">Correct Answer: B</option>
-              <option value="C">Correct Answer: C</option>
-              <option value="D">Correct Answer: D</option>
-            </select>
-
-            <div className="flex justify-end gap-3">
-              <button
-                className="px-5 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded-lg"
-                onClick={() => setEditingQ(null)}
-              >
-                Cancel
-              </button>
-
-              <button
-                className="px-5 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg"
-                onClick={() => updateQuestion(editingQ)}
-              >
-                Save
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      </div>
     </AdminLayout>
   );
 }
+
+/* ================= UI HELPERS ================= */
+
+function Card({ children }) {
+  return (
+    <div className="bg-white border border-gray-200 shadow p-4 sm:p-6">
+      {children}
+    </div>
+  );
+}
+
+const Input = ({ label, ...props }) => (
+  <div>
+    {label && <label className="block text-sm font-semibold mb-1">{label}</label>}
+    <input
+      {...props}
+      className="w-full border border-gray-300 rounded px-3 py-2 bg-gray-50 focus:ring-2 focus:ring-blue-500"
+    />
+  </div>
+);
+
+const Select = ({ label, options, ...props }) => (
+  <div>
+    <label className="block text-sm font-semibold mb-1">{label}</label>
+    <select
+      {...props}
+      className="w-full border border-gray-300 rounded px-3 py-2 bg-gray-50 focus:ring-2 focus:ring-blue-500"
+    >
+      <option value="">Select</option>
+      {options.map((o) => (
+        <option key={o.value} value={o.value}>
+          {o.label}
+        </option>
+      ))}
+    </select>
+  </div>
+);
+
+const Button = ({ children, loading, ...props }) => (
+  <button
+    {...props}
+    className="w-full bg-blue-600 hover:bg-blue-700 text-white rounded px-4 py-2 font-semibold"
+  >
+    {loading ? "Please wait..." : children}
+  </button>
+);
