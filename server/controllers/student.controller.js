@@ -115,7 +115,6 @@ export const submitExam = async (req, res) => {
       return res.status(400).json({ message: "Missing studentId or answers" });
     }
 
-    // FIND ACTIVE EXAM SESSION
     const active = await Result.findOne({
       studentId,
       submitted: false,
@@ -125,12 +124,6 @@ export const submitExam = async (req, res) => {
       return res.status(400).json({ message: "No active exam session." });
     }
 
-    const now = new Date();
-
-    // ALWAYS SCORE EVEN IF TIME IS OVER
-    // ❌ remove early return, just mark as submitted later
-
-    // FETCH EXAM WITH QUESTIONS
     const exam = await Exam.findById(active.examId)
       .populate("questions")
       .lean();
@@ -139,71 +132,53 @@ export const submitExam = async (req, res) => {
       return res.status(404).json({ message: "Exam not found." });
     }
 
-    const correctMarks = exam.marksCorrect;
-    const wrongMarks = exam.marksWrong;
-    const notAttemptedMarks = exam.marksNotAttempted;
+    const correctMarks = Number(exam.marksCorrect);
+    const wrongMarks = Number(exam.marksWrong);
+    const notAttemptedMarks = Number(exam.marksNotAttempted);
 
     let score = 0;
-    let answerDetails = [];
-
     let attemptedCount = 0;
     let notAttemptedCount = 0;
+    let answerDetails = [];
 
-    // 🔥 Normalize student answers to A/B/C/D
     const getOptionKey = (value, q) => {
       if (!value) return "";
       const v = value.toString().trim().toUpperCase();
 
       if (v === "NOT ATTEMPTED") return "";
-
       if (["A", "B", "C", "D"].includes(v)) return v;
 
-      if (v === "OPTION A") return "A";
-      if (v === "OPTION B") return "B";
-      if (v === "OPTION C") return "C";
-      if (v === "OPTION D") return "D";
-
-      // match full text
-      if (q.optionA && v === q.optionA.trim().toUpperCase()) return "A";
-      if (q.optionB && v === q.optionB.trim().toUpperCase()) return "B";
-      if (q.optionC && v === q.optionC.trim().toUpperCase()) return "C";
-      if (q.optionD && v === q.optionD.trim().toUpperCase()) return "D";
+      if (v === q.optionA?.trim().toUpperCase()) return "A";
+      if (v === q.optionB?.trim().toUpperCase()) return "B";
+      if (v === q.optionC?.trim().toUpperCase()) return "C";
+      if (v === q.optionD?.trim().toUpperCase()) return "D";
 
       return "";
     };
 
-    // 🔥 SCORE EACH QUESTION
     for (const q of exam.questions) {
       const qId = String(q._id);
       const studentAnsRaw = answers[qId] || null;
 
-      const correctKey = getOptionKey(q.correctAnswer, q); // A/B/C/D
-      const selectedKey = getOptionKey(studentAnsRaw, q);  // A/B/C/D
+      const correctKey = getOptionKey(q.correctAnswer, q);
+      const selectedKey = getOptionKey(studentAnsRaw, q);
 
-      let isCorrect = false;
       let marks = 0;
+      let isCorrect = false;
 
       if (!selectedKey) {
-        // NOT ATTEMPTED
         marks = notAttemptedMarks;
         notAttemptedCount++;
-
       } else if (selectedKey === correctKey) {
-        // CORRECT
         marks = correctMarks;
         isCorrect = true;
         attemptedCount++;
-
       } else {
-        // WRONG → APPLY NEGATIVE MARKING
-        marks = -(correctMarks / 3); // ⭐ TCS RULE
+        marks = wrongMarks; // ✅ USE EXAM SCHEMA
         attemptedCount++;
       }
 
       score += marks;
-
-      const selectedText = selectedKey ? q["option" + selectedKey] : "Not Attempted";
-      const correctText = correctKey ? q["option" + correctKey] : "";
 
       answerDetails.push({
         questionId: qId,
@@ -212,58 +187,36 @@ export const submitExam = async (req, res) => {
         optionB: q.optionB,
         optionC: q.optionC,
         optionD: q.optionD,
-
         selectedAnswer: selectedKey || "Not Attempted",
         correctAnswer: correctKey,
-        selectedAnswerText: selectedText,
-        correctAnswerText: correctText,
-
         isCorrect,
         marksGiven: marks,
       });
     }
 
-    // 🔥 SAVE SCORING + META
+    const totalMarks = exam.questions.length * correctMarks;
+
+    if (score < 0) score = 0;
+    if (score > totalMarks) score = totalMarks;
+
     active.score = Number(score.toFixed(2));
-    active.total = exam.questions.length;
+    active.total = totalMarks; // ✅ FIXED
     active.attempted = attemptedCount;
     active.notAttempted = notAttemptedCount;
-
-    active.submitted = true;
-    active.submittedAt = now;
     active.answers = answerDetails;
-
-    // ⭐ IMPORTANT FIX
+    active.submitted = true;
+    active.submittedAt = new Date();
     active.submissionType = submissionType || "manual_submit";
 
     await active.save();
 
-
-    // update student flag
     await User.findByIdAndUpdate(studentId, { hasSubmitted: true });
 
-    // 🔥 SEND PDF EMAIL
-    try {
-      const user = await User.findById(studentId).lean();
-      const pdfBuffer = await generateResultPdfBuffer(active._id);
-
-      await sendResultEmail(
-        user.email,
-        user.name,
-        exam.title,
-        pdfBuffer
-      );
-
-      console.log("Result PDF emailed to:", user.email);
-    } catch (err) {
-      console.error("Email/PDF sending failed:", err);
-    }
-
-    // RESPONSE
     return res.json({
       message: "Exam submitted successfully",
-      score,
-      total: exam.questions.length,
+      score: active.score,
+      total: active.total,
+      percentage: Math.round((active.score / active.total) * 10000) / 100,
       attempted: attemptedCount,
       notAttempted: notAttemptedCount,
       resultId: active._id,
