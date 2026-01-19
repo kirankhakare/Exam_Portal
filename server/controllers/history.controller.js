@@ -4,41 +4,47 @@ import Exam from "../models/Exam.js";
 
 export const getAllResults = async (req, res) => {
   try {
-    // newest first
     const results = await Result.find().sort({ createdAt: -1 });
-
     const finalData = [];
 
     for (let r of results) {
       const user = await User.findById(r.studentId);
       const exam = await Exam.findById(r.examId);
 
-      if (user) {
-        const percentage =
-          r.total > 0 ? ((r.score / r.total*marksCorrect) * 100).toFixed(2) : 0;
+      if (!user || !exam) continue;
 
-        finalData.push({
-          studentId: r.studentId,
-          
-          // 👇 Student
-          name: user.name,
-          email: user.email,
+      // ✅ get marksCorrect from EXAM
+      const marksCorrect = exam.marksCorrect || 1;
 
-          // 👇 Exam info
-          examTitle: exam?.title || "Unknown Exam",
+      // ✅ calculate total marks from exam
+      const totalMarks = exam.questionCount * marksCorrect;
 
-          // 👇 Result scoring
-          score: r.score,
-          total: r.total,
-          percentage,
+      // ✅ percentage logic (CORRECT)
+      const percentage =
+        totalMarks > 0
+          ? ((r.score / totalMarks) * 100).toFixed(2)
+          : "0.00";
 
-          // 👇 NEW FIELD
-          submissionType: r.submissionType || "manual_submit",
+      finalData.push({
+        studentId: r.studentId,
 
-          // 👇 Date
-          date: r.submittedAt || r.createdAt,
-        });
-      }
+        // Student
+        name: user.name,
+        email: user.email,
+
+        // Exam
+        examTitle: exam.title,
+        marksCorrect: exam.marksCorrect,
+        questionCount: exam.questionCount,
+
+        // Result
+        score: r.score,
+        totalMarks,
+        percentage,
+
+        submissionType: r.submissionType || "manual_submit",
+        date: r.submittedAt || r.createdAt,
+      });
     }
 
     res.json(finalData);
@@ -48,3 +54,4 @@ export const getAllResults = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
+
