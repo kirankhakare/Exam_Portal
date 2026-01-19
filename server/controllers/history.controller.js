@@ -15,7 +15,7 @@ export const getAllResults = async (req, res) => {
 
       if (user) {
         const percentage =
-          r.total > 0 ? ((r.score / r.total) * 100).toFixed(2) : 0;
+          r.total > 0 ? ((r.score / r.total*marksCorrect) * 100).toFixed(2) : 0;
 
         finalData.push({
           studentId: r.studentId,
