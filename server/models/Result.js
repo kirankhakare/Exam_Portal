@@ -1,4 +1,3 @@
-// backend/models/Result.js
 import mongoose from "mongoose";
 
 const answerSchema = new mongoose.Schema({
@@ -8,15 +7,14 @@ const answerSchema = new mongoose.Schema({
     required: true,
   },
 
-  // Store question + options snapshot at exam time
+  // Snapshot of question at exam time
   question: { type: String },
-
   optionA: { type: String },
   optionB: { type: String },
   optionC: { type: String },
   optionD: { type: String },
 
-  // Key: "A" | "B" | "C" | "D" | "Not Attempted"
+  // A | B | C | D | Not Attempted
   selectedAnswer: {
     type: String,
     default: "Not Attempted",
@@ -27,7 +25,6 @@ const answerSchema = new mongoose.Schema({
     default: null,
   },
 
-  // Human readable texts
   selectedAnswerText: { type: String },
   correctAnswerText: { type: String },
 
@@ -36,7 +33,7 @@ const answerSchema = new mongoose.Schema({
     default: false,
   },
 
-  // Per-question marks
+  // +ve / -ve / 0 marks
   marksGiven: {
     type: Number,
     default: 0,
@@ -57,17 +54,24 @@ const resultSchema = new mongoose.Schema(
       required: true,
     },
 
+    // MARKS OBTAINED
     score: {
       type: Number,
       default: 0,
     },
 
+    // TOTAL MARKS (IMPORTANT: not question count)
     total: {
       type: Number,
       default: 0,
     },
 
-    // NEW: summary counts
+    // ✅ DERIVED FIELD (AUTO)
+    percentage: {
+      type: Number,
+      default: 0,
+    },
+
     attempted: {
       type: Number,
       default: 0,
@@ -78,34 +82,38 @@ const resultSchema = new mongoose.Schema(
       default: 0,
     },
 
-    // NEW: manual_submit | timer_expired | fullscreen_exit | tab_switch_or_cheat
     submissionType: {
       type: String,
       default: "manual_submit",
     },
 
-    // All per-question details
     answers: [answerSchema],
 
-    // Session tracking
-    startTime: {
-      type: Date,
-    },
-
-    endTime: {
-      type: Date,
-    },
+    startTime: Date,
+    endTime: Date,
 
     submitted: {
       type: Boolean,
       default: false,
     },
 
-    submittedAt: {
-      type: Date,
-    },
+    submittedAt: Date,
   },
   { timestamps: true }
 );
+
+/**
+ * 🔥 AUTO-CALCULATE PERCENTAGE
+ * Runs every time result is saved
+ */
+resultSchema.pre("save", function (next) {
+  if (this.total > 0) {
+    this.percentage =
+      Math.round((this.score / this.total) * 10000) / 100;
+  } else {
+    this.percentage = 0;
+  }
+  next();
+});
 
 export default mongoose.model("Result", resultSchema);

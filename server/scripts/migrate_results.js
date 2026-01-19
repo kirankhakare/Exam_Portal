@@ -1,130 +1,62 @@
-// backend/scripts/migrate_results.js
-// Usage: node migrate_results.js <EXAM_ID>
-// e.g. node migrate_results.js 64abc...
+// server/scripts/migrate_results.js
+import mongoose from "mongoose";
+import dotenv from "dotenv";
+import Exam from "../models/Exam.js";
+import Result from "../models/Result.js";
 
-const mongoose = require("mongoose");
-const path = require("path");
-require("dotenv").config({ path: path.resolve(__dirname, "../.env") });
+dotenv.config(); // loads server/.env
 
-// adjust path if your db connection lives elsewhere
-const dbConnect = require("../config/db"); // should connect when required
-
-// Models
-const Exam = require("../models/Exam");
-const Result = require("../models/Result");
-const User = require("../models/User");
-
-async function gradeExam(exam, studentAnswersMap) {
-  const marks = exam.marks || { correct: 1, wrong: 0, unattempted: 0 };
-
-  let score = 0;
-  const answersDetailed = [];
-
-  // prepare question correct map
-  const qMap = new Map();
-  (exam.questions || []).forEach(q => qMap.set(String(q._id), q.correctOption));
-
-  for (const q of (exam.questions || [])) {
-    const qid = String(q._id);
-    const given = (studentAnswersMap[qid] === undefined) ? null : studentAnswersMap[qid];
-    let status, mark;
-
-    if (!given) {
-      status = "not_attempted";
-      mark = marks.unattempted ?? 0;
-    } else if (given === qMap.get(qid)) {
-      status = "correct";
-      mark = marks.correct;
-    } else {
-      status = "wrong";
-      mark = marks.wrong;
-    }
-
-    score += mark;
-    answersDetailed.push({
-      qId: qid,
-      selected: given || null,
-      correct: qMap.get(qid),
-      status,
-      mark
-    });
+async function connectDB() {
+  if (!process.env.MONGO_URL) {
+    throw new Error("MONGO_URL missing in .env");
   }
 
-  // determine possible range
-  const maxPossible = (exam.questions || []).length * Math.max(0, marks.correct);
-  const minPossible = (exam.questions || []).length * Math.min(0, marks.wrong);
-
-  return { score, maxPossible, minPossible, answersDetailed };
+  await mongoose.connect(process.env.MONGO_URL);
+  console.log("✅ MongoDB connected");
 }
 
-function computePercentage(score, minPossible, maxPossible) {
-  if (Number.isFinite(minPossible) && Number.isFinite(maxPossible) && maxPossible !== minPossible) {
-    const clamped = Math.max(minPossible, Math.min(maxPossible, score));
-    return Math.round(((clamped - minPossible) / (maxPossible - minPossible)) * 10000) / 100; // two decimals
+async function migrateResults() {
+  const results = await Result.find();
+  let updated = 0;
+
+  for (const r of results) {
+    // ❌ no populate needed
+    const exam = await Exam.findById(r.examId);
+    if (!exam || !Array.isArray(exam.questions)) continue;
+
+    const totalMarks = exam.questions.length * exam.marksCorrect;
+
+    let score = r.score ?? 0;
+
+    // safety clamps
+    if (score < 0) score = 0;
+    if (score > totalMarks) score = totalMarks;
+
+    const percentage =
+      totalMarks > 0
+        ? Math.round((score / totalMarks) * 10000) / 100
+        : 0;
+
+    r.total = totalMarks;
+    r.score = score;
+    r.percentage = percentage;
+
+    await r.save();
+    updated++;
   }
-  // fallback
-  return maxPossible ? Math.round((score / maxPossible) * 10000) / 100 : 0;
+
+  console.log(`✅ Migration completed. Updated ${updated} results`);
 }
 
-async function run() {
-  const examId = process.argv[2];
-  if (!examId) {
-    console.error("Please provide examId: node migrate_results.js <EXAM_ID>");
-    process.exit(1);
-  }
-
-  await dbConnect(); // ensure connection (depends on your db file returning a function)
-  console.log("Connected to DB");
-
-  const exam = await Exam.findById(examId).lean();
-  if (!exam) {
-    console.error("Exam not found:", examId);
+(async () => {
+  try {
+    await connectDB();
+    await migrateResults();
     await mongoose.disconnect();
+    console.log("🔚 Done");
+    process.exit(0);
+  } catch (err) {
+    console.error("❌ Migration failed:", err.message);
     process.exit(1);
   }
-
-  const resultsCursor = Result.find({ exam: examId }).cursor();
-  let count = 0;
-
-  for (let doc = await resultsCursor.next(); doc != null; doc = await resultsCursor.next()) {
-    try {
-      // build studentAnswers map from doc.answers (assumes stored per-question)
-      const studentAnswersMap = {};
-      if (Array.isArray(doc.answers)) {
-        doc.answers.forEach(a => {
-          // adjust if your stored selected option property name differs
-          studentAnswersMap[String(a.qId)] = a.selected === "Not Attempted" ? null : a.selected;
-        });
-      }
-
-      const graded = await gradeExam(exam, studentAnswersMap);
-      const percentage = computePercentage(graded.score, graded.minPossible, graded.maxPossible);
-
-      // write back
-      await Result.updateOne({ _id: doc._id }, {
-        $set: {
-          score: graded.score,
-          maxPossible: graded.maxPossible,
-          minPossible: graded.minPossible,
-          percentage,
-          answers: graded.answersDetailed,
-          migratedAt: new Date()
-        }
-      });
-
-      count++;
-      if (count % 100 === 0) console.log("Processed:", count);
-    } catch (err) {
-      console.error("Error processing result", doc._id, err);
-    }
-  }
-
-  console.log("Migration complete. Processed:", count);
-  await mongoose.disconnect();
-  process.exit(0);
-}
-
-run().catch(err => {
-  console.error(err);
-  process.exit(1);
-});
+})();
