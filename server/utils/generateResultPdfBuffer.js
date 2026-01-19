@@ -14,12 +14,13 @@ export default async function generateResultPdfBuffer(resultId) {
       if (!result) return reject(new Error("Result not found"));
 
       const student = await User.findById(result.studentId).lean();
-      const exam = await Exam.findById(result.examId)
-        .populate("questions")
-        .lean();
+
+      // ❌ no populate needed
+      const exam = await Exam.findById(result.examId).lean();
+      if (!exam) return reject(new Error("Exam not found"));
 
       const totalQuestions = exam.questions.length;
-      const totalMarks = result.total; // ✅ already MARKS
+      const totalMarks = result.total; // ✅ MARKS
       const score = result.score;
 
       const percentage =
@@ -29,7 +30,9 @@ export default async function generateResultPdfBuffer(resultId) {
 
       // Fetch questions used in result
       const questionIds = result.answers.map(a => a.questionId);
-      const questions = await Question.find({ _id: { $in: questionIds } }).lean();
+      const questions = await Question.find({
+        _id: { $in: questionIds }
+      }).lean();
 
       const answerMap = {};
       result.answers.forEach(a => {
